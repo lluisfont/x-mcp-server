@@ -1,17 +1,13 @@
 import 'dotenv/config';
 import { WebStandardStreamableHTTPServerTransport } from '@modelcontextprotocol/server';
+import { randomUUID } from 'node:crypto';
 import { createServer, type IncomingMessage, type ServerResponse } from 'node:http';
 import { Readable } from 'node:stream';
 import { loadConfig } from './config.js';
 import { buildServer } from './server.js';
 
 const config = loadConfig();
-const transport = new WebStandardStreamableHTTPServerTransport({
-  sessionIdGenerator: undefined,
-  enableJsonResponse: true,
-});
-
-await buildServer(config).connect(transport);
+const transports = new Map<string, WebStandardStreamableHTTPServerTransport>();
 
 const server = createServer((req, res) => {
   void handleRequest(req, res).catch(error => {
@@ -38,7 +34,7 @@ async function handleRequest(req: IncomingMessage, res: ServerResponse): Promise
   }
 
   if (url.pathname !== config.httpPath) {
-    await writeWebResponse(res, new Response('Not found', { status: 404 }));
+    await writeWebResponse(res, Response.json({ error: 'not_found' }, { status: 404 }));
     return;
   }
 
@@ -47,7 +43,61 @@ async function handleRequest(req: IncomingMessage, res: ServerResponse): Promise
     return;
   }
 
-  await writeWebResponse(res, await transport.handleRequest(toWebRequest(req, url)));
+  const request = toWebRequest(req, url);
+  const transport = await getTransport(req, res);
+
+  if (!transport) {
+    return;
+  }
+
+  const response = await transport.handleRequest(request);
+
+  const initializedSessionId = response.headers.get('mcp-session-id');
+
+  if (initializedSessionId) {
+    transports.set(initializedSessionId, transport);
+  }
+
+  await writeWebResponse(res, response);
+}
+
+async function getTransport(req: IncomingMessage, res: ServerResponse): Promise<WebStandardStreamableHTTPServerTransport | undefined> {
+  const sessionId = getHeaderValue(req, 'mcp-session-id');
+
+  if (sessionId) {
+    const existing = transports.get(sessionId);
+
+    if (!existing) {
+      await writeWebResponse(res, Response.json({ error: 'session_not_found' }, { status: 404 }));
+      return undefined;
+    }
+
+    return existing;
+  }
+
+  const transport = new WebStandardStreamableHTTPServerTransport({
+    sessionIdGenerator: randomUUID,
+    enableJsonResponse: true,
+    onsessioninitialized: initializedSessionId => {
+      transports.set(initializedSessionId, transport);
+    },
+    onsessionclosed: closedSessionId => {
+      transports.delete(closedSessionId);
+    },
+  });
+
+  await buildServer(config).connect(transport);
+  return transport;
+}
+
+function getHeaderValue(req: IncomingMessage, headerName: string): string | undefined {
+  const value = req.headers[headerName.toLowerCase()];
+
+  if (Array.isArray(value)) {
+    return value[0];
+  }
+
+  return value;
 }
 
 function toWebRequest(req: IncomingMessage, url: URL): Request {
