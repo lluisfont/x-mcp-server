@@ -13,6 +13,7 @@ Devuelve:
 - Perfil local activo.
 - Cuentas configuradas.
 - Modo actual.
+- Si la renovacion automatica de token esta configurada.
 - Usuario autenticado en X.
 
 Uso recomendado:

@@ -67,7 +67,7 @@ the tunnel; it does not receive your X access tokens.
 
 | Tool | Type | Description |
 | --- | --- | --- |
-| `x_get_active_account` | Read | Returns the selected local profile, configured accounts, mode, and authenticated X user. |
+| `x_get_active_account` | Read | Returns the selected local profile, configured accounts, mode, refresh readiness, and authenticated X user. |
 | `x_get_me` | Read | Returns the authenticated X user. |
 | `x_get_user` | Read | Looks up an X user by username. |
 | `x_get_post` | Read | Reads a post by ID. |
@@ -131,6 +131,7 @@ For a named local account:
 X_MCP_ACCOUNT=fcbnews2026
 X_MCP_MODE=read-only
 X_API_BASE_URL=https://api.x.com
+X_OAUTH_CLIENT_ID=
 
 X_ACCOUNT_FCBNEWS2026_USER_ACCESS_TOKEN=
 X_ACCOUNT_FCBNEWS2026_REFRESH_TOKEN=
@@ -428,6 +429,17 @@ npm run x:oauth
 
 Open the generated URL while logged into the intended X account. After
 authorization, the helper updates `.env` with the selected account token.
+
+At runtime, the server can automatically refresh an expired X access token when
+both values are available:
+
+```env
+X_OAUTH_CLIENT_ID=
+X_ACCOUNT_FCBNEWS2026_REFRESH_TOKEN=
+```
+
+When X returns `401 Unauthorized`, the client refreshes the token, persists the
+new token pair in `.env`, and retries the original request once.
 
 Restart the MCP server after reauthorization:
 

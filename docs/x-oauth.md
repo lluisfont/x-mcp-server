@@ -11,6 +11,9 @@ npm run x:oauth
 implementa Authorization Code + PKCE y guarda el access token en `.env` para la
 cuenta seleccionada.
 
+El servidor tambien usa el refresh token guardado para renovar automaticamente
+el access token cuando X devuelve `401 Unauthorized`.
+
 ## Configuracion en X Developer
 
 En la app de X Developer:
@@ -63,6 +66,14 @@ Al autorizar, el helper guarda:
 X_ACCOUNT_FCBNEWS2026_USER_ACCESS_TOKEN=
 X_ACCOUNT_FCBNEWS2026_REFRESH_TOKEN=
 ```
+
+En cada arranque, el servidor lee ambos tokens. Si una peticion a X falla con
+`401 Unauthorized` y existe `X_OAUTH_CLIENT_ID`, el cliente:
+
+1. Solicita un nuevo access token usando `grant_type=refresh_token`.
+2. Actualiza el access token en memoria.
+3. Guarda el nuevo access token y refresh token en `.env`.
+4. Reintenta la peticion original una vez.
 
 Si `X_MCP_ACCOUNT=default`, guarda:
 

@@ -4,6 +4,11 @@ export type McpTransport = 'stdio' | 'http';
 export interface AppConfig {
   xApiBaseUrl: string;
   xUserAccessToken: string;
+  xRefreshToken?: string;
+  xOAuthClientId?: string;
+  xOAuthClientSecret?: string;
+  xAccessTokenEnvKey: string;
+  xRefreshTokenEnvKey: string;
   activeAccount: string;
   configuredAccounts: string[];
   mode: McpMode;
@@ -15,6 +20,7 @@ export interface AppConfig {
 const DEFAULT_ACCOUNT = 'default';
 const ACCOUNT_TOKEN_PREFIX = 'X_ACCOUNT_';
 const ACCOUNT_TOKEN_SUFFIX = '_USER_ACCESS_TOKEN';
+const ACCOUNT_REFRESH_TOKEN_SUFFIX = '_REFRESH_TOKEN';
 
 function normalizeAccountName(account: string): string {
   return account.trim().replace(/[^a-zA-Z0-9]+/g, '-').replace(/^-+|-+$/g, '').toLowerCase();
@@ -53,7 +59,9 @@ export function loadConfig(env: NodeJS.ProcessEnv = process.env): AppConfig {
   const configuredAccounts = getConfiguredAccounts(env);
   const activeAccount = normalizeAccountName(env.X_MCP_ACCOUNT ?? DEFAULT_ACCOUNT) || DEFAULT_ACCOUNT;
   const accountTokenKey = `X_ACCOUNT_${toEnvAccountName(activeAccount)}_USER_ACCESS_TOKEN`;
+  const accountRefreshTokenKey = `X_ACCOUNT_${toEnvAccountName(activeAccount)}_REFRESH_TOKEN`;
   const xUserAccessToken = (env[accountTokenKey] ?? (activeAccount === DEFAULT_ACCOUNT ? env.X_USER_ACCESS_TOKEN : undefined))?.trim();
+  const xRefreshToken = (env[accountRefreshTokenKey] ?? (activeAccount === DEFAULT_ACCOUNT ? env.X_REFRESH_TOKEN : undefined))?.trim();
 
   if (!xUserAccessToken) {
     const configured = configuredAccounts.length > 0 ? ` Configured accounts: ${configuredAccounts.join(', ')}.` : '';
@@ -63,6 +71,11 @@ export function loadConfig(env: NodeJS.ProcessEnv = process.env): AppConfig {
   return {
     xApiBaseUrl: (env.X_API_BASE_URL ?? 'https://api.x.com').replace(/\/$/, ''),
     xUserAccessToken,
+    xRefreshToken,
+    xOAuthClientId: env.X_OAUTH_CLIENT_ID?.trim(),
+    xOAuthClientSecret: env.X_OAUTH_CLIENT_SECRET?.trim(),
+    xAccessTokenEnvKey: accountTokenKey,
+    xRefreshTokenEnvKey: accountRefreshTokenKey,
     activeAccount,
     configuredAccounts,
     mode,

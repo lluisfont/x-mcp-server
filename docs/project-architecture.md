@@ -27,6 +27,7 @@ src/config.ts
 src/x/client.ts
   -> cliente HTTP de la API de X
   -> gestion uniforme de errores de X
+  -> renovacion automatica de access tokens con refresh token
 
 scripts/x-oauth-authorize.ts
   -> helper local OAuth 2.0 + PKCE
@@ -128,6 +129,11 @@ Los errores de X se normalizan como resultados MCP de error:
   "details": {}
 }
 ```
+
+Cuando X devuelve `401 Unauthorized`, el cliente intenta renovar el access token
+si la configuracion local incluye `refresh_token` y `X_OAUTH_CLIENT_ID`. Tras una
+renovacion correcta, persiste los nuevos tokens y reintenta la peticion original
+una sola vez.
 
 Los errores internos se devuelven como:
 

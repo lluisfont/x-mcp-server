@@ -6,6 +6,11 @@ describe('loadConfig', () => {
     expect(loadConfig({ X_USER_ACCESS_TOKEN: ' token ' })).toEqual({
       xApiBaseUrl: 'https://api.x.com',
       xUserAccessToken: 'token',
+      xRefreshToken: undefined,
+      xOAuthClientId: undefined,
+      xOAuthClientSecret: undefined,
+      xAccessTokenEnvKey: 'X_ACCOUNT_DEFAULT_USER_ACCESS_TOKEN',
+      xRefreshTokenEnvKey: 'X_ACCOUNT_DEFAULT_REFRESH_TOKEN',
       activeAccount: 'default',
       configuredAccounts: ['default'],
       mode: 'read-only',
@@ -18,11 +23,19 @@ describe('loadConfig', () => {
   it('accepts read-write mode and trims a custom base URL', () => {
     expect(loadConfig({
       X_USER_ACCESS_TOKEN: 'token',
+      X_REFRESH_TOKEN: 'refresh-token',
+      X_OAUTH_CLIENT_ID: 'client-id',
+      X_OAUTH_CLIENT_SECRET: 'client-secret',
       X_MCP_MODE: 'read-write',
       X_API_BASE_URL: 'https://proxy.example.test/',
     })).toEqual({
       xApiBaseUrl: 'https://proxy.example.test',
       xUserAccessToken: 'token',
+      xRefreshToken: 'refresh-token',
+      xOAuthClientId: 'client-id',
+      xOAuthClientSecret: 'client-secret',
+      xAccessTokenEnvKey: 'X_ACCOUNT_DEFAULT_USER_ACCESS_TOKEN',
+      xRefreshTokenEnvKey: 'X_ACCOUNT_DEFAULT_REFRESH_TOKEN',
       activeAccount: 'default',
       configuredAccounts: ['default'],
       mode: 'read-write',
@@ -40,10 +53,16 @@ describe('loadConfig', () => {
     expect(loadConfig({
       X_MCP_ACCOUNT: 'personal',
       X_ACCOUNT_PERSONAL_USER_ACCESS_TOKEN: ' personal-token ',
+      X_ACCOUNT_PERSONAL_REFRESH_TOKEN: ' personal-refresh ',
       X_ACCOUNT_WORK_USER_ACCESS_TOKEN: 'work-token',
     })).toEqual({
       xApiBaseUrl: 'https://api.x.com',
       xUserAccessToken: 'personal-token',
+      xRefreshToken: 'personal-refresh',
+      xOAuthClientId: undefined,
+      xOAuthClientSecret: undefined,
+      xAccessTokenEnvKey: 'X_ACCOUNT_PERSONAL_USER_ACCESS_TOKEN',
+      xRefreshTokenEnvKey: 'X_ACCOUNT_PERSONAL_REFRESH_TOKEN',
       activeAccount: 'personal',
       configuredAccounts: ['personal', 'work'],
       mode: 'read-only',
@@ -92,6 +111,8 @@ describe('assertWriteEnabled', () => {
   const baseConfig: AppConfig = {
     xApiBaseUrl: 'https://api.x.com',
     xUserAccessToken: 'token',
+    xAccessTokenEnvKey: 'X_ACCOUNT_DEFAULT_USER_ACCESS_TOKEN',
+    xRefreshTokenEnvKey: 'X_ACCOUNT_DEFAULT_REFRESH_TOKEN',
     activeAccount: 'default',
     configuredAccounts: ['default'],
     mode: 'read-only',

@@ -25,6 +25,8 @@ Copy-Item .env.example .env
 | `X_MCP_TRANSPORT` | `stdio` | Transporte: `stdio` o `http`. |
 | `X_MCP_HTTP_PORT` | `3001` | Puerto HTTP local. |
 | `X_MCP_HTTP_PATH` | `/mcp` | Path MCP HTTP. |
+| `X_OAUTH_CLIENT_ID` | vacio | Client ID usado por el helper OAuth y por el refresh automatico. |
+| `X_OAUTH_CLIENT_SECRET` | vacio | Client Secret opcional para apps confidenciales. |
 
 ## Modo seguro
 
@@ -41,6 +43,34 @@ X_MCP_MODE=read-write
 ```
 
 Aunque `read-write` este activo, el token de X debe tener scope `tweet.write`.
+
+## Renovacion automatica de tokens
+
+Si X devuelve `401 Unauthorized`, el cliente intenta renovar el access token una
+vez antes de devolver error.
+
+Para que funcione, deben existir:
+
+```env
+X_OAUTH_CLIENT_ID=
+X_ACCOUNT_FCBNEWS2026_REFRESH_TOKEN=
+```
+
+El servidor llama a:
+
+```text
+POST https://api.x.com/2/oauth2/token
+grant_type=refresh_token
+```
+
+Si X devuelve un nuevo access token, el servidor:
+
+- Actualiza el token en memoria.
+- Actualiza `.env`.
+- Reintenta una vez la peticion original.
+
+Si el refresh token tambien es invalido, hay que reautorizar con
+`npm run x:oauth`.
 
 ## Configuracion multicuentas
 
@@ -124,7 +154,7 @@ http://127.0.0.1:3001/healthz
 
 ## Variables OAuth para X
 
-Usadas solo por el helper `npm run x:oauth`.
+Usadas por el helper `npm run x:oauth` y por la renovacion automatica de tokens.
 
 | Variable | Valor por defecto | Descripcion |
 | --- | --- | --- |
