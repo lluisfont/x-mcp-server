@@ -33,6 +33,11 @@ async function handleRequest(req: IncomingMessage, res: ServerResponse): Promise
     return;
   }
 
+  if (url.pathname.startsWith('/.well-known/oauth-protected-resource')) {
+    await writeWebResponse(res, new Response(null, { status: 404 }));
+    return;
+  }
+
   if (url.pathname !== config.httpPath) {
     await writeWebResponse(res, Response.json({ error: 'not_found' }, { status: 404 }));
     return;
@@ -77,7 +82,6 @@ async function getTransport(req: IncomingMessage, res: ServerResponse): Promise<
 
   const transport = new WebStandardStreamableHTTPServerTransport({
     sessionIdGenerator: randomUUID,
-    enableJsonResponse: true,
     onsessioninitialized: initializedSessionId => {
       transports.set(initializedSessionId, transport);
     },
