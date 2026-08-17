@@ -136,6 +136,10 @@ Respuesta esperada:
 {"ok":true,"transport":"http","activeAccount":"fcbnews2026","mode":"read-write"}
 ```
 
+Para arrancar, parar o automatizar el servidor local al iniciar Windows:
+
+[docs/local-server-lifecycle.md](docs/local-server-lifecycle.md)
+
 ## Conectar con ChatGPT
 
 Resumen del flujo:
@@ -191,6 +195,7 @@ actualizara `.env` con el token de la cuenta seleccionada.
 
 - [docs/project-architecture.md](docs/project-architecture.md): arquitectura del proyecto.
 - [docs/configuration.md](docs/configuration.md): variables de entorno y multicuentas.
+- [docs/local-server-lifecycle.md](docs/local-server-lifecycle.md): activar, desactivar y automatizar el servidor local.
 - [docs/tools.md](docs/tools.md): herramientas MCP y contratos de uso.
 - [docs/x-oauth.md](docs/x-oauth.md): reautorizacion OAuth de X.
 - [docs/development.md](docs/development.md): desarrollo, pruebas y criterios de cambios.

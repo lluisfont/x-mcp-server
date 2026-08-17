@@ -62,6 +62,7 @@ docs/
   chatgpt-mcp-setup.md
   configuration.md
   development.md
+  local-server-lifecycle.md
   project-architecture.md
   tools.md
   x-oauth.md

@@ -14,6 +14,11 @@ La idea es seguir siempre el mismo orden:
 6. Probar primero lectura y despues escritura
 ```
 
+Para la operacion diaria, documentar tambien como se arrancara y parara el MCP
+en cada ordenador:
+
+[docs/local-server-lifecycle.md](local-server-lifecycle.md)
+
 ## Arquitectura
 
 ```text
@@ -324,6 +329,10 @@ Resultado esperado:
 ```text
 StatusCode: 200
 ```
+
+Para uso puntual, mantener abiertas la terminal del servidor MCP y la terminal
+del tunnel. Para uso diario, configurar el arranque automatico al iniciar
+Windows siguiendo [docs/local-server-lifecycle.md](local-server-lifecycle.md).
 
 ## 10. Crear la aplicacion MCP en ChatGPT
 
