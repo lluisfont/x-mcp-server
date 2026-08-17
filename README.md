@@ -4,7 +4,7 @@ Model Context Protocol (MCP) server that exposes a focused set of tools over the
 
 ## Status
 
-Early MVP. The server currently runs locally over stdio and uses an OAuth 2.0 user access token supplied through the environment.
+Early MVP. The server runs locally over stdio or over Streamable HTTP for remote MCP hosts, using an OAuth 2.0 user access token supplied through the environment.
 
 ## Initial tools
 
@@ -36,6 +36,7 @@ cp .env.example .env
 ```
 
 Set `X_USER_ACCESS_TOKEN` in `.env` or in the environment used by your MCP host.
+The local `dev` and `start` scripts load `.env` automatically.
 
 > Never commit `.env`, access tokens, refresh tokens, client secrets, or private keys.
 
@@ -89,16 +90,48 @@ npm run dev
 
 The server uses stdio. stdout is reserved for MCP protocol traffic; diagnostic output goes to stderr.
 
+## Run over HTTP
+
+Use the HTTP entrypoint when a remote MCP host needs a URL instead of a local
+stdio process:
+
+```bash
+npm run dev:http
+```
+
+By default this serves MCP at:
+
+```text
+http://127.0.0.1:3001/mcp
+```
+
+HTTP settings can be changed per installation:
+
+```bash
+X_MCP_TRANSPORT=http
+X_MCP_HTTP_PORT=3001
+X_MCP_HTTP_PATH=/mcp
+```
+
+The HTTP server also exposes `GET /healthz` for deployment checks. ChatGPT
+requires the MCP endpoint to be available through a stable HTTPS URL, for
+example `https://x-mcp.example.com/mcp`.
+
 ## MCP host example
 
 After installing dependencies, configure a compatible MCP host to launch the project with Node/tsx and provide the environment variables. Exact client configuration differs between ChatGPT, Claude, Codex and other MCP hosts.
+
+For ChatGPT, deploy the HTTP entrypoint behind HTTPS, then add the MCP endpoint
+in Developer Mode and scan the available tools. Start by testing
+`x_get_active_account`, then `x_get_me`, and only enable publishing with
+`X_MCP_MODE=read-write` once the selected account is correct.
 
 ## Architecture
 
 ```text
 MCP host
    |
-   | stdio
+   | stdio or Streamable HTTP
    v
 x-mcp-server
    |
@@ -116,7 +149,7 @@ The current MVP keeps X operations atomic. Higher-level workflows such as conten
 3. Add delete, like/unlike, repost/unrepost and mentions tools.
 4. Add rate-limit metadata and retry policy.
 5. Add automated tests and CI.
-6. Add Streamable HTTP deployment mode if remote/shared access is needed.
+6. Add MCP resource-server authentication for shared remote deployments.
 
 ## Security
 

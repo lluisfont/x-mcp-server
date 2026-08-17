@@ -1,4 +1,5 @@
 export type McpMode = 'read-only' | 'read-write';
+export type McpTransport = 'stdio' | 'http';
 
 export interface AppConfig {
   xApiBaseUrl: string;
@@ -6,6 +7,9 @@ export interface AppConfig {
   activeAccount: string;
   configuredAccounts: string[];
   mode: McpMode;
+  transport: McpTransport;
+  httpPort: number;
+  httpPath: string;
 }
 
 const DEFAULT_ACCOUNT = 'default';
@@ -43,6 +47,9 @@ function getConfiguredAccounts(env: NodeJS.ProcessEnv): string[] {
 
 export function loadConfig(env: NodeJS.ProcessEnv = process.env): AppConfig {
   const mode = env.X_MCP_MODE === 'read-write' ? 'read-write' : 'read-only';
+  const transport = env.X_MCP_TRANSPORT === 'http' ? 'http' : 'stdio';
+  const httpPort = parseHttpPort(env.PORT ?? env.X_MCP_HTTP_PORT);
+  const httpPath = parseHttpPath(env.X_MCP_HTTP_PATH);
   const configuredAccounts = getConfiguredAccounts(env);
   const activeAccount = normalizeAccountName(env.X_MCP_ACCOUNT ?? DEFAULT_ACCOUNT) || DEFAULT_ACCOUNT;
   const accountTokenKey = `X_ACCOUNT_${toEnvAccountName(activeAccount)}_USER_ACCESS_TOKEN`;
@@ -59,7 +66,26 @@ export function loadConfig(env: NodeJS.ProcessEnv = process.env): AppConfig {
     activeAccount,
     configuredAccounts,
     mode,
+    transport,
+    httpPort,
+    httpPath,
   };
+}
+
+function parseHttpPort(port: string | undefined): number {
+  const parsed = Number(port ?? 3001);
+
+  if (!Number.isInteger(parsed) || parsed < 1 || parsed > 65535) {
+    throw new Error(`Invalid HTTP port: ${port}`);
+  }
+
+  return parsed;
+}
+
+function parseHttpPath(path: string | undefined): string {
+  const normalized = path?.trim() || '/mcp';
+
+  return normalized.startsWith('/') ? normalized : `/${normalized}`;
 }
 
 export function assertWriteEnabled(config: AppConfig): void {

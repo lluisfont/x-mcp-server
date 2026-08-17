@@ -9,6 +9,9 @@ describe('loadConfig', () => {
       activeAccount: 'default',
       configuredAccounts: ['default'],
       mode: 'read-only',
+      transport: 'stdio',
+      httpPort: 3001,
+      httpPath: '/mcp',
     });
   });
 
@@ -23,6 +26,9 @@ describe('loadConfig', () => {
       activeAccount: 'default',
       configuredAccounts: ['default'],
       mode: 'read-write',
+      transport: 'stdio',
+      httpPort: 3001,
+      httpPath: '/mcp',
     });
   });
 
@@ -41,7 +47,30 @@ describe('loadConfig', () => {
       activeAccount: 'personal',
       configuredAccounts: ['personal', 'work'],
       mode: 'read-only',
+      transport: 'stdio',
+      httpPort: 3001,
+      httpPath: '/mcp',
     });
+  });
+
+  it('loads HTTP transport settings', () => {
+    expect(loadConfig({
+      X_USER_ACCESS_TOKEN: 'token',
+      X_MCP_TRANSPORT: 'http',
+      X_MCP_HTTP_PORT: '4010',
+      X_MCP_HTTP_PATH: 'custom-mcp',
+    })).toMatchObject({
+      transport: 'http',
+      httpPort: 4010,
+      httpPath: '/custom-mcp',
+    });
+  });
+
+  it('rejects invalid HTTP ports', () => {
+    expect(() => loadConfig({
+      X_USER_ACCESS_TOKEN: 'token',
+      X_MCP_HTTP_PORT: '99999',
+    })).toThrow(/Invalid HTTP port/);
   });
 
   it('normalizes selected account names to environment variable names', () => {
@@ -66,6 +95,9 @@ describe('assertWriteEnabled', () => {
     activeAccount: 'default',
     configuredAccounts: ['default'],
     mode: 'read-only',
+    transport: 'stdio',
+    httpPort: 3001,
+    httpPath: '/mcp',
   };
 
   it('blocks writes unless read-write mode is explicit', () => {

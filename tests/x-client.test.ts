@@ -8,6 +8,9 @@ const config: AppConfig = {
   activeAccount: 'default',
   configuredAccounts: ['default'],
   mode: 'read-only',
+  transport: 'stdio',
+  httpPort: 3001,
+  httpPath: '/mcp',
 };
 
 describe('XClient', () => {
