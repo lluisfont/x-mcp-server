@@ -9,6 +9,7 @@ Early MVP. The server currently runs locally over stdio and uses an OAuth 2.0 us
 ## Initial tools
 
 - `x_get_me` — authenticated user
+- `x_get_active_account` — selected local account profile and authenticated user
 - `x_get_user` — user lookup by username
 - `x_get_post` — post lookup by ID
 - `x_get_user_posts` — recent posts for a user ID
@@ -37,6 +38,32 @@ cp .env.example .env
 Set `X_USER_ACCESS_TOKEN` in `.env` or in the environment used by your MCP host.
 
 > Never commit `.env`, access tokens, refresh tokens, client secrets, or private keys.
+
+## Multiple local accounts
+
+Each computer can select its own X account profile without changing code. The
+legacy single-account setup still works:
+
+```bash
+X_MCP_ACCOUNT=default
+X_USER_ACCESS_TOKEN=...
+```
+
+For multiple accounts, define one token per named profile and select the active
+profile with `X_MCP_ACCOUNT`:
+
+```bash
+X_MCP_ACCOUNT=personal
+X_ACCOUNT_PERSONAL_USER_ACCESS_TOKEN=...
+X_ACCOUNT_WORK_USER_ACCESS_TOKEN=...
+```
+
+Account names are local labels only. For example, `X_MCP_ACCOUNT=work` uses
+`X_ACCOUNT_WORK_USER_ACCESS_TOKEN`. Another installation can select a different
+account by changing only its local `.env` or MCP host environment.
+
+Use `x_get_active_account` to verify which local profile and authenticated X
+user are active. The tool never returns access or refresh tokens.
 
 ## Safety mode
 

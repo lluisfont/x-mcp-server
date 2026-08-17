@@ -5,6 +5,8 @@ import type { AppConfig } from '../src/config.js';
 const config: AppConfig = {
   xApiBaseUrl: 'https://api.x.com',
   xUserAccessToken: 'token',
+  activeAccount: 'default',
+  configuredAccounts: ['default'],
   mode: 'read-only',
 };
 

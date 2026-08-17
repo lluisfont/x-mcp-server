@@ -25,6 +25,21 @@ export function buildServer(config: AppConfig): McpServer {
   const server = new McpServer({ name: 'x-mcp-server', version: '0.1.0' });
   const x = new XClient(config);
 
+  server.registerTool('x_get_active_account', {
+    description: 'Get the local X account profile selected for this MCP server installation. Does not expose tokens.',
+    inputSchema: z.object({}),
+    annotations: { readOnlyHint: true },
+  }, async () => {
+    try {
+      return asToolResult({
+        activeAccount: config.activeAccount,
+        configuredAccounts: config.configuredAccounts,
+        mode: config.mode,
+        me: await x.get('/2/users/me', { 'user.fields': 'id,name,username,created_at,description,public_metrics,verified' }),
+      });
+    } catch (error) { return asToolError(error); }
+  });
+
   server.registerTool('x_get_me', {
     description: 'Get the authenticated X user.',
     inputSchema: z.object({}),

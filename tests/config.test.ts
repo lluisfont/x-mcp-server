@@ -6,6 +6,8 @@ describe('loadConfig', () => {
     expect(loadConfig({ X_USER_ACCESS_TOKEN: ' token ' })).toEqual({
       xApiBaseUrl: 'https://api.x.com',
       xUserAccessToken: 'token',
+      activeAccount: 'default',
+      configuredAccounts: ['default'],
       mode: 'read-only',
     });
   });
@@ -18,12 +20,42 @@ describe('loadConfig', () => {
     })).toEqual({
       xApiBaseUrl: 'https://proxy.example.test',
       xUserAccessToken: 'token',
+      activeAccount: 'default',
+      configuredAccounts: ['default'],
       mode: 'read-write',
     });
   });
 
   it('requires a user access token', () => {
-    expect(() => loadConfig({})).toThrow(/X_USER_ACCESS_TOKEN is required/);
+    expect(() => loadConfig({})).toThrow(/No access token configured for X_MCP_ACCOUNT=default/);
+  });
+
+  it('selects a named account token for this installation', () => {
+    expect(loadConfig({
+      X_MCP_ACCOUNT: 'personal',
+      X_ACCOUNT_PERSONAL_USER_ACCESS_TOKEN: ' personal-token ',
+      X_ACCOUNT_WORK_USER_ACCESS_TOKEN: 'work-token',
+    })).toEqual({
+      xApiBaseUrl: 'https://api.x.com',
+      xUserAccessToken: 'personal-token',
+      activeAccount: 'personal',
+      configuredAccounts: ['personal', 'work'],
+      mode: 'read-only',
+    });
+  });
+
+  it('normalizes selected account names to environment variable names', () => {
+    expect(loadConfig({
+      X_MCP_ACCOUNT: 'Luis Font',
+      X_ACCOUNT_LUIS_FONT_USER_ACCESS_TOKEN: 'token',
+    }).activeAccount).toBe('luis-font');
+  });
+
+  it('reports available accounts when the selected account is missing a token', () => {
+    expect(() => loadConfig({
+      X_MCP_ACCOUNT: 'missing',
+      X_ACCOUNT_PERSONAL_USER_ACCESS_TOKEN: 'token',
+    })).toThrow(/Configured accounts: personal/);
   });
 });
 
@@ -31,6 +63,8 @@ describe('assertWriteEnabled', () => {
   const baseConfig: AppConfig = {
     xApiBaseUrl: 'https://api.x.com',
     xUserAccessToken: 'token',
+    activeAccount: 'default',
+    configuredAccounts: ['default'],
     mode: 'read-only',
   };
 
