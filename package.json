@@ -10,6 +10,7 @@
   "scripts": {
     "dev": "tsx src/index.ts",
     "dev:http": "tsx src/http.ts",
+    "x:oauth": "tsx scripts/x-oauth-authorize.ts",
     "build": "tsc -p tsconfig.json",
     "start": "node dist/src/index.js",
     "start:http": "node dist/src/http.js",
