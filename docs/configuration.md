@@ -69,6 +69,10 @@ Si X devuelve un nuevo access token, el servidor:
 - Actualiza `.env`.
 - Reintenta una vez la peticion original.
 
+Ademas, antes de cada herramienta de escritura, el servidor intenta refrescar el
+access token de forma proactiva cuando existen las credenciales de refresh. Esto
+reduce fallos de publicacion por tokens cercanos a caducar.
+
 Si el refresh token tambien es invalido, hay que reautorizar con
 `npm run x:oauth`.
 

@@ -75,6 +75,11 @@ En cada arranque, el servidor lee ambos tokens. Si una peticion a X falla con
 3. Guarda el nuevo access token y refresh token en `.env`.
 4. Reintenta la peticion original una vez.
 
+Para herramientas de escritura, el servidor tambien intenta refrescar el token
+antes de publicar. La comprobacion previa recomendada desde el agente sigue
+siendo `x_get_active_account`, porque confirma cuenta, modo y estado de
+renovacion sin publicar nada.
+
 Si `X_MCP_ACCOUNT=default`, guarda:
 
 ```env

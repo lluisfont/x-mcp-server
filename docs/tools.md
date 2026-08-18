@@ -96,6 +96,10 @@ El token tambien debe tener scope:
 tweet.write
 ```
 
+Antes de cada operacion de escritura, el servidor intenta refrescar el access
+token si hay `refresh_token` y `X_OAUTH_CLIENT_ID` configurados. Si no puede
+refrescar, la escritura continua con el token actual y X decide si lo acepta.
+
 ### `x_create_post`
 
 Input:
@@ -150,5 +154,6 @@ Uso recomendado:
 - El texto exacto esta aprobado.
 - El MCP esta en `read-write`.
 - El token tiene permisos de escritura.
+- La renovacion automatica aparece configurada en `x_get_active_account`.
 - El agente sabe que debe devolver el ID.
 - No hay automatismos que publiquen sin confirmacion.

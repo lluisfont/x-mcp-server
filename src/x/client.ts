@@ -45,6 +45,15 @@ export class XClient {
     });
   }
 
+  async ensureFreshAccessToken(): Promise<boolean> {
+    if (!this.canRefresh()) {
+      return false;
+    }
+
+    await this.refreshAccessToken();
+    return true;
+  }
+
   private async request<T>(url: URL, init: RequestInit, allowRefresh = true): Promise<T> {
     const response = await fetch(url, {
       ...init,

@@ -91,7 +91,11 @@ export function buildServer(config: AppConfig): McpServer {
     inputSchema: z.object({ text: z.string().min(1).max(25000) }),
     annotations: { readOnlyHint: false, destructiveHint: false },
   }, async ({ text }) => {
-    try { assertWriteEnabled(config); return asToolResult(await x.post('/2/tweets', { text })); }
+    try {
+      assertWriteEnabled(config);
+      await x.ensureFreshAccessToken();
+      return asToolResult(await x.post('/2/tweets', { text }));
+    }
     catch (error) { return asToolError(error); }
   });
 
@@ -102,6 +106,7 @@ export function buildServer(config: AppConfig): McpServer {
   }, async ({ postId, text }) => {
     try {
       assertWriteEnabled(config);
+      await x.ensureFreshAccessToken();
       return asToolResult(await x.post('/2/tweets', { text, reply: { in_reply_to_tweet_id: postId } }));
     } catch (error) { return asToolError(error); }
   });

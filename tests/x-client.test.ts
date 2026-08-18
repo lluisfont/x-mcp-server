@@ -124,4 +124,35 @@ describe('XClient', () => {
       'X_ACCOUNT_DEFAULT_USER_ACCESS_TOKEN=new-access-token\nX_ACCOUNT_DEFAULT_REFRESH_TOKEN=new-refresh-token\n',
     );
   });
+
+  it('can proactively refresh the access token before a write operation', async () => {
+    const fetchMock = vi.spyOn(globalThis, 'fetch').mockResolvedValueOnce(
+      new Response(JSON.stringify({
+        access_token: 'fresh-access-token',
+        refresh_token: 'fresh-refresh-token',
+      }), { status: 200 }),
+    );
+
+    const client = new XClient({
+      ...config,
+      xRefreshToken: 'refresh-token',
+      xOAuthClientId: 'client-id',
+    });
+
+    await expect(client.ensureFreshAccessToken()).resolves.toBe(true);
+
+    expect(fetchMock).toHaveBeenCalledTimes(1);
+    expect(String(fetchMock.mock.calls[0][0])).toBe('https://api.x.com/2/oauth2/token');
+    expect(process.env.X_ACCOUNT_DEFAULT_USER_ACCESS_TOKEN).toBe('fresh-access-token');
+    expect(process.env.X_ACCOUNT_DEFAULT_REFRESH_TOKEN).toBe('fresh-refresh-token');
+  });
+
+  it('skips proactive refresh when refresh credentials are not configured', async () => {
+    const fetchMock = vi.spyOn(globalThis, 'fetch');
+    const client = new XClient(config);
+
+    await expect(client.ensureFreshAccessToken()).resolves.toBe(false);
+
+    expect(fetchMock).not.toHaveBeenCalled();
+  });
 });

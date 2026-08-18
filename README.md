@@ -441,6 +441,10 @@ X_ACCOUNT_FCBNEWS2026_REFRESH_TOKEN=
 When X returns `401 Unauthorized`, the client refreshes the token, persists the
 new token pair in `.env`, and retries the original request once.
 
+Before every write operation, the server also refreshes the access token
+proactively when refresh credentials are configured. This keeps publication
+attempts from depending on an access token that may be close to expiration.
+
 Restart the MCP server after reauthorization:
 
 ```powershell
@@ -476,6 +480,7 @@ Before publishing:
 - Verify the active account with `x_get_active_account`.
 - Confirm the exact text to publish.
 - Ensure the X token has `tweet.write`.
+- Keep refresh credentials configured so writes can refresh the token first.
 - Ask the agent to return the generated `post_id`.
 - Do not treat a post as published until X returns an ID.
 
