@@ -29,10 +29,12 @@ Implemented:
 - MCP server over Streamable HTTP.
 - Official X API client.
 - Local multi-account configuration.
+- Recommended `xurl` authentication provider, using X's official CLI for OAuth
+  token storage, refresh and rotation.
 - Safe `read-only` mode by default.
 - Explicit `read-write` mode for publishing and replies.
-- Local OAuth 2.0 Authorization Code + PKCE helper for X account
-  reauthorization.
+- Legacy local OAuth 2.0 Authorization Code + PKCE helper for direct env-token
+  setups.
 - Unit tests with Vitest.
 - ChatGPT connection guide through OpenAI Secure MCP Tunnels.
 - Local server lifecycle guide for manual and automatic startup on Windows.
@@ -67,7 +69,7 @@ the tunnel; it does not receive your X access tokens.
 
 | Tool | Type | Description |
 | --- | --- | --- |
-| `x_get_active_account` | Read | Returns the selected local profile, configured accounts, mode, refresh readiness, and authenticated X user. |
+| `x_get_active_account` | Read | Returns the selected local profile, configured accounts, auth provider, mode, and authenticated X user. |
 | `x_get_me` | Read | Returns the authenticated X user. |
 | `x_get_user` | Read | Looks up an X user by username. |
 | `x_get_post` | Read | Reads a post by ID. |
@@ -85,7 +87,7 @@ Write tools are blocked unless `X_MCP_MODE=read-write` is set.
 - An X Developer App with OAuth 2.0 enabled.
 - X read scopes: `tweet.read users.read`.
 - X write scope for publishing and replies: `tweet.write`.
-- Recommended X refresh scope: `offline.access`.
+- Recommended X token manager: X's official `xurl` CLI.
 - For ChatGPT: Developer Mode enabled.
 - For ChatGPT local connections: an OpenAI Secure MCP Tunnel and
   `tunnel-client`.
@@ -120,26 +122,50 @@ Copy-Item .env.example .env
 
 Edit `.env` locally.
 
-Do not commit `.env`. It may contain access tokens, refresh tokens, client
-secrets, and private API keys.
+Do not commit `.env`. It may contain local app names, usernames, access tokens,
+refresh tokens, client secrets, and private API keys.
 
 ### 4. Configure the Active X Account
 
-For a named local account:
+Recommended setup: use `xurl` as the token manager.
 
 ```env
+X_AUTH_PROVIDER=xurl
+X_XURL_APP=fcbnews
+X_XURL_USERNAME=FCBNews2026
 X_MCP_ACCOUNT=fcbnews2026
 X_MCP_MODE=read-only
 X_API_BASE_URL=https://api.x.com
-X_OAUTH_CLIENT_ID=
-
-X_ACCOUNT_FCBNEWS2026_USER_ACCESS_TOKEN=
-X_ACCOUNT_FCBNEWS2026_REFRESH_TOKEN=
 ```
 
-For multiple accounts on the same computer:
+Configure `xurl` once outside this project:
+
+```powershell
+$secret = Read-Host "X OAuth Client Secret" -AsSecureString
+$plain = [Runtime.InteropServices.Marshal]::PtrToStringAuto(
+  [Runtime.InteropServices.Marshal]::SecureStringToBSTR($secret)
+)
+npx -y @xdevplatform/xurl auth apps add fcbnews --client-id "<OAuth 2.0 Client ID>" --client-secret $plain --redirect-uri http://localhost:8080/callback
+npx -y @xdevplatform/xurl auth oauth2 --app fcbnews FCBNews2026
+```
+
+Register this callback URI in the X Developer App:
+
+```text
+http://localhost:8080/callback
+```
+
+`xurl` stores tokens in its own local store and refreshes/persists them when
+needed. The MCP server calls:
+
+```powershell
+npx -y @xdevplatform/xurl token --app fcbnews -u FCBNews2026
+```
+
+Legacy direct-token setup is still available with `X_AUTH_PROVIDER=env`:
 
 ```env
+X_AUTH_PROVIDER=env
 X_MCP_ACCOUNT=fcbnews2026
 X_MCP_MODE=read-only
 
@@ -150,17 +176,15 @@ X_ACCOUNT_LLUISFONT_USER_ACCESS_TOKEN=
 X_ACCOUNT_LLUISFONT_REFRESH_TOKEN=
 ```
 
-`X_MCP_ACCOUNT` selects the local profile used by this installation. Different
-computers can select different accounts without changing code.
-
-The legacy single-account mode is also supported:
+The legacy single-account env-token mode is also supported:
 
 ```env
+X_AUTH_PROVIDER=env
 X_MCP_ACCOUNT=default
 X_USER_ACCESS_TOKEN=
 ```
 
-New installations should prefer named accounts.
+New installations should prefer `X_AUTH_PROVIDER=xurl`.
 
 ### 5. Choose the Transport
 
@@ -410,40 +434,19 @@ Full ChatGPT setup guide:
 
 ## Reauthorize an X Account
 
-In X Developer, configure the app:
+Recommended `xurl` flow:
 
-```text
-OAuth 2.0: Enabled
-App permissions: Read and write
-Callback URI: http://127.0.0.1:3002/callback
-Website URL: http://127.0.0.1:3002
+```powershell
+npx -y @xdevplatform/xurl auth oauth2 --app fcbnews FCBNews2026
 ```
 
-Run:
+Use the legacy helper only for `X_AUTH_PROVIDER=env`:
 
 ```powershell
 $env:X_OAUTH_CLIENT_ID = "<OAuth 2.0 Client ID>"
 $env:X_MCP_ACCOUNT = "fcbnews2026"
 npm run x:oauth
 ```
-
-Open the generated URL while logged into the intended X account. After
-authorization, the helper updates `.env` with the selected account token.
-
-At runtime, the server can automatically refresh an expired X access token when
-both values are available:
-
-```env
-X_OAUTH_CLIENT_ID=
-X_ACCOUNT_FCBNEWS2026_REFRESH_TOKEN=
-```
-
-When X returns `401 Unauthorized`, the client refreshes the token, persists the
-new token pair in `.env`, and retries the original request once.
-
-Before every write operation, the server also refreshes the access token
-proactively when refresh credentials are configured. This keeps publication
-attempts from depending on an access token that may be close to expiration.
 
 Restart the MCP server after reauthorization:
 
@@ -480,7 +483,8 @@ Before publishing:
 - Verify the active account with `x_get_active_account`.
 - Confirm the exact text to publish.
 - Ensure the X token has `tweet.write`.
-- Keep refresh credentials configured so writes can refresh the token first.
+- Prefer `X_AUTH_PROVIDER=xurl` so X token refresh and rotation are handled by
+  X's official CLI.
 - Ask the agent to return the generated `post_id`.
 - Do not treat a post as published until X returns an ID.
 

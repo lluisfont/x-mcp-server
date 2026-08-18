@@ -35,7 +35,7 @@ export function buildServer(config: AppConfig): McpServer {
         activeAccount: config.activeAccount,
         configuredAccounts: config.configuredAccounts,
         mode: config.mode,
-        tokenRefreshConfigured: Boolean(config.xRefreshToken && config.xOAuthClientId),
+        auth: await x.getAuthStatus(),
         me: await x.get('/2/users/me', { 'user.fields': 'id,name,username,created_at,description,public_metrics,verified' }),
       });
     } catch (error) { return asToolError(error); }
@@ -93,7 +93,6 @@ export function buildServer(config: AppConfig): McpServer {
   }, async ({ text }) => {
     try {
       assertWriteEnabled(config);
-      await x.ensureFreshAccessToken();
       return asToolResult(await x.post('/2/tweets', { text }));
     }
     catch (error) { return asToolError(error); }
@@ -106,7 +105,6 @@ export function buildServer(config: AppConfig): McpServer {
   }, async ({ postId, text }) => {
     try {
       assertWriteEnabled(config);
-      await x.ensureFreshAccessToken();
       return asToolResult(await x.post('/2/tweets', { text, reply: { in_reply_to_tweet_id: postId } }));
     } catch (error) { return asToolError(error); }
   });

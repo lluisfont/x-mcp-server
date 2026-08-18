@@ -27,7 +27,7 @@ src/config.ts
 src/x/client.ts
   -> cliente HTTP de la API de X
   -> gestion uniforme de errores de X
-  -> renovacion automatica de access tokens con refresh token
+  -> obtencion de tokens validos mediante xurl o env-token legacy
 
 scripts/x-oauth-authorize.ts
   -> helper local OAuth 2.0 + PKCE
@@ -130,10 +130,9 @@ Los errores de X se normalizan como resultados MCP de error:
 }
 ```
 
-Cuando X devuelve `401 Unauthorized`, el cliente intenta renovar el access token
-si la configuracion local incluye `refresh_token` y `X_OAUTH_CLIENT_ID`. Tras una
-renovacion correcta, persiste los nuevos tokens y reintenta la peticion original
-una sola vez.
+Con `X_AUTH_PROVIDER=xurl`, la gestion de token, refresh y rotacion queda en
+manos de la CLI oficial de X. El MCP llama a `xurl token` para obtener un token
+valido antes de llamar a la API de X.
 
 Los errores internos se devuelven como:
 

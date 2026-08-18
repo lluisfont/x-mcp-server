@@ -1,15 +1,15 @@
+import { execFile } from 'node:child_process';
 import { afterEach, describe, expect, it, vi } from 'vitest';
-import { readFile, writeFile } from 'node:fs/promises';
-import { XApiError, XClient } from '../src/x/client.js';
 import type { AppConfig } from '../src/config.js';
+import { XApiError, XClient } from '../src/x/client.js';
 
-vi.mock('node:fs/promises', () => ({
-  readFile: vi.fn().mockResolvedValue(''),
-  writeFile: vi.fn().mockResolvedValue(undefined),
+vi.mock('node:child_process', () => ({
+  execFile: vi.fn(),
 }));
 
-const config: AppConfig = {
+const envConfig: AppConfig = {
   xApiBaseUrl: 'https://api.x.com',
+  xAuthProvider: 'env',
   xUserAccessToken: 'token',
   xAccessTokenEnvKey: 'X_ACCOUNT_DEFAULT_USER_ACCESS_TOKEN',
   xRefreshTokenEnvKey: 'X_ACCOUNT_DEFAULT_REFRESH_TOKEN',
@@ -21,19 +21,25 @@ const config: AppConfig = {
   httpPath: '/mcp',
 };
 
+const xurlConfig: AppConfig = {
+  ...envConfig,
+  xAuthProvider: 'xurl',
+  xUserAccessToken: undefined,
+  xurlApp: 'fcbnews',
+  xurlUsername: 'FCBNews2026',
+};
+
 describe('XClient', () => {
   afterEach(() => {
     vi.restoreAllMocks();
-    vi.mocked(readFile).mockResolvedValue('');
-    vi.mocked(writeFile).mockResolvedValue(undefined);
   });
 
-  it('sends bearer auth and query parameters for GET requests', async () => {
+  it('sends bearer auth and query parameters for env-token GET requests', async () => {
     const fetchMock = vi.spyOn(globalThis, 'fetch').mockResolvedValueOnce(
       new Response(JSON.stringify({ data: { id: '123' } }), { status: 200 }),
     );
 
-    const client = new XClient(config);
+    const client = new XClient(envConfig);
     await expect(client.get('/2/users/me', { 'user.fields': 'username', max_results: 10 })).resolves.toEqual({
       data: { id: '123' },
     });
@@ -47,12 +53,12 @@ describe('XClient', () => {
     });
   });
 
-  it('sends JSON POST bodies', async () => {
+  it('sends JSON POST bodies with env-token auth', async () => {
     const fetchMock = vi.spyOn(globalThis, 'fetch').mockResolvedValueOnce(
       new Response(JSON.stringify({ data: { id: 'tweet-id' } }), { status: 201 }),
     );
 
-    const client = new XClient(config);
+    const client = new XClient(envConfig);
     await expect(client.post('/2/tweets', { text: 'hello' })).resolves.toEqual({
       data: { id: 'tweet-id' },
     });
@@ -72,7 +78,7 @@ describe('XClient', () => {
       new Response(JSON.stringify({ title: 'Unauthorized', detail: 'Bad token' }), { status: 401 }),
     );
 
-    const client = new XClient(config);
+    const client = new XClient(envConfig);
     await expect(client.get('/2/users/me')).rejects.toMatchObject({
       name: 'XApiError',
       message: 'Bad token',
@@ -81,78 +87,70 @@ describe('XClient', () => {
     });
   });
 
-  it('refreshes the access token once after a 401 and retries the original request', async () => {
+  it('gets a valid token from xurl and caches it for subsequent requests', async () => {
+    vi.mocked(execFile).mockImplementation((...args: unknown[]) => {
+      const callback = args.at(-1) as (error: Error | null, stdout: string, stderr: string) => void;
+      callback?.(null, 'xurl-token\n', '');
+      return undefined as never;
+    });
     const fetchMock = vi.spyOn(globalThis, 'fetch')
-      .mockResolvedValueOnce(
-        new Response(JSON.stringify({ title: 'Unauthorized', detail: 'Expired token' }), { status: 401 }),
-      )
-      .mockResolvedValueOnce(
-        new Response(JSON.stringify({
-          access_token: 'new-access-token',
-          refresh_token: 'new-refresh-token',
-        }), { status: 200 }),
-      )
-      .mockResolvedValueOnce(
-        new Response(JSON.stringify({ data: { id: '123' } }), { status: 200 }),
-      );
+      .mockResolvedValueOnce(new Response(JSON.stringify({ data: { id: '1' } }), { status: 200 }))
+      .mockResolvedValueOnce(new Response(JSON.stringify({ data: { id: '2' } }), { status: 200 }));
 
-    vi.mocked(readFile).mockResolvedValue('X_ACCOUNT_DEFAULT_USER_ACCESS_TOKEN=old\nX_ACCOUNT_DEFAULT_REFRESH_TOKEN=old-refresh\n');
+    const client = new XClient(xurlConfig);
+    await expect(client.get('/2/users/me')).resolves.toEqual({ data: { id: '1' } });
+    await expect(client.get('/2/users/me')).resolves.toEqual({ data: { id: '2' } });
 
-    const client = new XClient({
-      ...config,
-      xRefreshToken: 'refresh-token',
-      xOAuthClientId: 'client-id',
-    });
-
-    await expect(client.get('/2/users/me')).resolves.toEqual({ data: { id: '123' } });
-
-    expect(fetchMock).toHaveBeenCalledTimes(3);
-    expect(String(fetchMock.mock.calls[1][0])).toBe('https://api.x.com/2/oauth2/token');
-    expect(fetchMock.mock.calls[1][1]).toMatchObject({
-      method: 'POST',
-      headers: {
-        'content-type': 'application/x-www-form-urlencoded',
-        accept: 'application/json',
-      },
-    });
-    expect(String(fetchMock.mock.calls[1][1]?.body)).toBe('grant_type=refresh_token&refresh_token=refresh-token&client_id=client-id');
-    expect(fetchMock.mock.calls[2][1]?.headers).toMatchObject({
-      authorization: 'Bearer new-access-token',
-    });
-    expect(writeFile).toHaveBeenCalledWith(
-      '.env',
-      'X_ACCOUNT_DEFAULT_USER_ACCESS_TOKEN=new-access-token\nX_ACCOUNT_DEFAULT_REFRESH_TOKEN=new-refresh-token\n',
+    expect(execFile).toHaveBeenCalledTimes(1);
+    expect(execFile).toHaveBeenCalledWith(
+      'npx',
+      ['-y', '@xdevplatform/xurl', 'token', '--app', 'fcbnews', '-u', 'FCBNews2026'],
+      expect.objectContaining({ windowsHide: true }),
+      expect.any(Function),
     );
+    expect(fetchMock.mock.calls[0][1]?.headers).toMatchObject({ authorization: 'Bearer xurl-token' });
+    expect(fetchMock.mock.calls[1][1]?.headers).toMatchObject({ authorization: 'Bearer xurl-token' });
   });
 
-  it('can proactively refresh the access token before a write operation', async () => {
-    const fetchMock = vi.spyOn(globalThis, 'fetch').mockResolvedValueOnce(
-      new Response(JSON.stringify({
-        access_token: 'fresh-access-token',
-        refresh_token: 'fresh-refresh-token',
-      }), { status: 200 }),
-    );
+  it('clears the cached xurl token and retries once after a 401', async () => {
+    vi.mocked(execFile)
+      .mockImplementationOnce((...args: unknown[]) => {
+        const callback = args.at(-1) as (error: Error | null, stdout: string, stderr: string) => void;
+        callback?.(null, 'expired-token\n', '');
+        return undefined as never;
+      })
+      .mockImplementationOnce((...args: unknown[]) => {
+        const callback = args.at(-1) as (error: Error | null, stdout: string, stderr: string) => void;
+        callback?.(null, 'fresh-token\n', '');
+        return undefined as never;
+      });
+    const fetchMock = vi.spyOn(globalThis, 'fetch')
+      .mockResolvedValueOnce(new Response(JSON.stringify({ title: 'Unauthorized' }), { status: 401 }))
+      .mockResolvedValueOnce(new Response(JSON.stringify({ data: { id: 'ok' } }), { status: 200 }));
 
-    const client = new XClient({
-      ...config,
-      xRefreshToken: 'refresh-token',
-      xOAuthClientId: 'client-id',
-    });
+    const client = new XClient(xurlConfig);
+    await expect(client.get('/2/users/me')).resolves.toEqual({ data: { id: 'ok' } });
 
-    await expect(client.ensureFreshAccessToken()).resolves.toBe(true);
-
-    expect(fetchMock).toHaveBeenCalledTimes(1);
-    expect(String(fetchMock.mock.calls[0][0])).toBe('https://api.x.com/2/oauth2/token');
-    expect(process.env.X_ACCOUNT_DEFAULT_USER_ACCESS_TOKEN).toBe('fresh-access-token');
-    expect(process.env.X_ACCOUNT_DEFAULT_REFRESH_TOKEN).toBe('fresh-refresh-token');
+    expect(execFile).toHaveBeenCalledTimes(2);
+    expect(fetchMock.mock.calls[0][1]?.headers).toMatchObject({ authorization: 'Bearer expired-token' });
+    expect(fetchMock.mock.calls[1][1]?.headers).toMatchObject({ authorization: 'Bearer fresh-token' });
   });
 
-  it('skips proactive refresh when refresh credentials are not configured', async () => {
-    const fetchMock = vi.spyOn(globalThis, 'fetch');
-    const client = new XClient(config);
+  it('reports xurl auth status without exposing the token', async () => {
+    vi.mocked(execFile).mockImplementation((...args: unknown[]) => {
+      const callback = args.at(-1) as (error: Error | null, stdout: string, stderr: string) => void;
+      callback?.(null, 'xurl-token\n', '');
+      return undefined as never;
+    });
 
-    await expect(client.ensureFreshAccessToken()).resolves.toBe(false);
+    const client = new XClient(xurlConfig);
 
-    expect(fetchMock).not.toHaveBeenCalled();
+    await expect(client.getAuthStatus()).resolves.toEqual({
+      provider: 'xurl',
+      xurlApp: 'fcbnews',
+      xurlUsername: 'FCBNews2026',
+      tokenAvailable: true,
+      tokenRefreshManagedBy: 'xurl',
+    });
   });
 });

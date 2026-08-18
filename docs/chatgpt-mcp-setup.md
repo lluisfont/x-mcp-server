@@ -404,7 +404,7 @@ Antes de publicar, comprobar:
 - El MCP esta en `read-write`.
 - La cuenta activa es correcta.
 - El token del servicio final tiene permisos de escritura.
-- `x_get_active_account` indica que `tokenRefreshConfigured` esta activo.
+- `x_get_active_account` confirma la cuenta correcta y el proveedor de auth esperado.
 - El texto exacto esta aprobado.
 - El agente entiende que debe devolver el ID de la accion creada.
 

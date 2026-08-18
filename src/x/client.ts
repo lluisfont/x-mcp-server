@@ -1,5 +1,5 @@
+import { execFile } from 'node:child_process';
 import type { AppConfig } from '../config.js';
-import { readFile, writeFile } from 'node:fs/promises';
 
 export interface XApiErrorBody {
   title?: string;
@@ -21,13 +21,9 @@ export class XApiError extends Error {
 }
 
 export class XClient {
-  private accessToken: string;
-  private refreshToken?: string;
+  private cachedXurlToken?: string;
 
-  constructor(private readonly config: AppConfig) {
-    this.accessToken = config.xUserAccessToken;
-    this.refreshToken = config.xRefreshToken;
-  }
+  constructor(private readonly config: AppConfig) {}
 
   async get<T>(path: string, query?: Record<string, string | number | undefined>): Promise<T> {
     const url = new URL(`${this.config.xApiBaseUrl}${path}`);
@@ -45,27 +41,37 @@ export class XClient {
     });
   }
 
-  async ensureFreshAccessToken(): Promise<boolean> {
-    if (!this.canRefresh()) {
-      return false;
+  async getAuthStatus(): Promise<Record<string, unknown>> {
+    if (this.config.xAuthProvider === 'xurl') {
+      const token = await this.getAccessToken();
+      return {
+        provider: 'xurl',
+        xurlApp: this.config.xurlApp,
+        xurlUsername: this.config.xurlUsername,
+        tokenAvailable: Boolean(token),
+        tokenRefreshManagedBy: 'xurl',
+      };
     }
 
-    await this.refreshAccessToken();
-    return true;
+    return {
+      provider: 'env',
+      tokenAvailable: Boolean(this.config.xUserAccessToken),
+      tokenRefreshConfigured: Boolean(this.config.xRefreshToken && this.config.xOAuthClientId),
+    };
   }
 
-  private async request<T>(url: URL, init: RequestInit, allowRefresh = true): Promise<T> {
+  private async request<T>(url: URL, init: RequestInit, allowRetry = true): Promise<T> {
     const response = await fetch(url, {
       ...init,
       headers: {
-        authorization: `Bearer ${this.accessToken}`,
+        authorization: `Bearer ${await this.getAccessToken()}`,
         accept: 'application/json',
         ...init.headers,
       },
     });
 
-    if (response.status === 401 && allowRefresh && this.canRefresh()) {
-      await this.refreshAccessToken();
+    if (response.status === 401 && allowRetry && this.config.xAuthProvider === 'xurl') {
+      this.cachedXurlToken = undefined;
       return this.request<T>(url, init, false);
     }
 
@@ -80,51 +86,61 @@ export class XClient {
     return payload as T;
   }
 
-  private canRefresh(): boolean {
-    return Boolean(this.refreshToken && this.config.xOAuthClientId);
-  }
-
-  private async refreshAccessToken(): Promise<void> {
-    if (!this.refreshToken || !this.config.xOAuthClientId) {
-      throw new Error('Cannot refresh X access token without X refresh token and OAuth client ID.');
+  private async getAccessToken(): Promise<string> {
+    if (this.config.xAuthProvider === 'xurl') {
+      this.cachedXurlToken ??= await getXurlToken(this.config);
+      return this.cachedXurlToken;
     }
 
-    const response = await fetch(new URL(`${this.config.xApiBaseUrl}/2/oauth2/token`), {
-      method: 'POST',
-      headers: this.tokenHeaders(),
-      body: new URLSearchParams({
-        grant_type: 'refresh_token',
-        refresh_token: this.refreshToken,
-        client_id: this.config.xOAuthClientId,
-      }),
+    if (!this.config.xUserAccessToken) {
+      throw new Error('No X access token configured.');
+    }
+
+    return this.config.xUserAccessToken;
+  }
+}
+
+async function getXurlToken(config: AppConfig): Promise<string> {
+  if (!config.xurlApp) {
+    throw new Error('X_AUTH_PROVIDER=xurl requires X_XURL_APP.');
+  }
+
+  const args = ['-y', '@xdevplatform/xurl', 'token', '--app', config.xurlApp];
+
+  if (config.xurlUsername) {
+    args.push('-u', config.xurlUsername);
+  }
+
+  try {
+    const stdout = await execFileText('npx', args, {
+      windowsHide: true,
+      timeout: 120_000,
+      maxBuffer: 1024 * 1024,
     });
+    const token = stdout.trim();
 
-    const payload = await parseResponsePayload(response) as TokenPayload;
-
-    if (!response.ok || !payload.access_token) {
-      const detail = typeof payload === 'object' && payload ? JSON.stringify(payload) : String(payload);
-      throw new XApiError(`X OAuth refresh failed with HTTP ${response.status}: ${detail}`, response.status, payload);
+    if (!token) {
+      throw new Error('xurl token returned an empty token.');
     }
 
-    this.accessToken = payload.access_token;
-    this.refreshToken = payload.refresh_token ?? this.refreshToken;
-    process.env[this.config.xAccessTokenEnvKey] = this.accessToken;
-    process.env[this.config.xRefreshTokenEnvKey] = this.refreshToken;
-    await updateDotEnv(this.config.xAccessTokenEnvKey, this.accessToken, this.config.xRefreshTokenEnvKey, this.refreshToken);
+    return token;
+  } catch (error) {
+    const message = error instanceof Error ? error.message : String(error);
+    throw new Error(`Failed to get X access token from xurl. Run xurl auth oauth2 for the configured app/user. ${message}`);
   }
+}
 
-  private tokenHeaders(): Record<string, string> {
-    const headers: Record<string, string> = {
-      'content-type': 'application/x-www-form-urlencoded',
-      accept: 'application/json',
-    };
+function execFileText(file: string, args: string[], options: { windowsHide: boolean; timeout: number; maxBuffer: number }): Promise<string> {
+  return new Promise((resolve, reject) => {
+    execFile(file, args, options, (error, stdout, stderr) => {
+      if (error) {
+        reject(new Error(stderr || error.message));
+        return;
+      }
 
-    if (this.config.xOAuthClientSecret) {
-      headers.authorization = `Basic ${Buffer.from(`${this.config.xOAuthClientId}:${this.config.xOAuthClientSecret}`).toString('base64')}`;
-    }
-
-    return headers;
-  }
+      resolve(stdout);
+    });
+  });
 }
 
 async function parseResponsePayload(response: Response): Promise<unknown> {
@@ -139,33 +155,4 @@ async function parseResponsePayload(response: Response): Promise<unknown> {
   } catch {
     return raw;
   }
-}
-
-async function updateDotEnv(accessKey: string, accessToken: string, refreshKey: string, refreshToken: string): Promise<void> {
-  const path = '.env';
-  const existing = await readFile(path, 'utf8').catch(() => '');
-  const updated = upsertEnv(upsertEnv(existing, accessKey, accessToken), refreshKey, refreshToken);
-
-  await writeFile(path, updated);
-}
-
-function upsertEnv(contents: string, key: string, value: string): string {
-  const line = `${key}=${value}`;
-  const pattern = new RegExp(`^${escapeRegExp(key)}=.*$`, 'm');
-
-  if (pattern.test(contents)) {
-    return contents.replace(pattern, line);
-  }
-
-  const suffix = contents.endsWith('\n') || contents.length === 0 ? '' : '\n';
-  return `${contents}${suffix}${line}\n`;
-}
-
-function escapeRegExp(value: string): string {
-  return value.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
-}
-
-interface TokenPayload {
-  access_token?: string;
-  refresh_token?: string;
 }

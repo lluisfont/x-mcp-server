@@ -5,12 +5,15 @@ describe('loadConfig', () => {
   it('defaults to read-only mode and trims the token', () => {
     expect(loadConfig({ X_USER_ACCESS_TOKEN: ' token ' })).toEqual({
       xApiBaseUrl: 'https://api.x.com',
+      xAuthProvider: 'env',
       xUserAccessToken: 'token',
       xRefreshToken: undefined,
       xOAuthClientId: undefined,
       xOAuthClientSecret: undefined,
       xAccessTokenEnvKey: 'X_ACCOUNT_DEFAULT_USER_ACCESS_TOKEN',
       xRefreshTokenEnvKey: 'X_ACCOUNT_DEFAULT_REFRESH_TOKEN',
+      xurlApp: undefined,
+      xurlUsername: undefined,
       activeAccount: 'default',
       configuredAccounts: ['default'],
       mode: 'read-only',
@@ -30,12 +33,15 @@ describe('loadConfig', () => {
       X_API_BASE_URL: 'https://proxy.example.test/',
     })).toEqual({
       xApiBaseUrl: 'https://proxy.example.test',
+      xAuthProvider: 'env',
       xUserAccessToken: 'token',
       xRefreshToken: 'refresh-token',
       xOAuthClientId: 'client-id',
       xOAuthClientSecret: 'client-secret',
       xAccessTokenEnvKey: 'X_ACCOUNT_DEFAULT_USER_ACCESS_TOKEN',
       xRefreshTokenEnvKey: 'X_ACCOUNT_DEFAULT_REFRESH_TOKEN',
+      xurlApp: undefined,
+      xurlUsername: undefined,
       activeAccount: 'default',
       configuredAccounts: ['default'],
       mode: 'read-write',
@@ -49,6 +55,26 @@ describe('loadConfig', () => {
     expect(() => loadConfig({})).toThrow(/No access token configured for X_MCP_ACCOUNT=default/);
   });
 
+  it('loads xurl auth provider without requiring env access tokens', () => {
+    expect(loadConfig({
+      X_AUTH_PROVIDER: 'xurl',
+      X_XURL_APP: 'fcbnews',
+      X_XURL_USERNAME: 'FCBNews2026',
+    })).toMatchObject({
+      xAuthProvider: 'xurl',
+      xurlApp: 'fcbnews',
+      xurlUsername: 'FCBNews2026',
+      activeAccount: 'default',
+      configuredAccounts: [],
+    });
+  });
+
+  it('requires an xurl app when xurl auth provider is selected', () => {
+    expect(() => loadConfig({
+      X_AUTH_PROVIDER: 'xurl',
+    })).toThrow(/X_AUTH_PROVIDER=xurl requires X_XURL_APP/);
+  });
+
   it('selects a named account token for this installation', () => {
     expect(loadConfig({
       X_MCP_ACCOUNT: 'personal',
@@ -57,12 +83,15 @@ describe('loadConfig', () => {
       X_ACCOUNT_WORK_USER_ACCESS_TOKEN: 'work-token',
     })).toEqual({
       xApiBaseUrl: 'https://api.x.com',
+      xAuthProvider: 'env',
       xUserAccessToken: 'personal-token',
       xRefreshToken: 'personal-refresh',
       xOAuthClientId: undefined,
       xOAuthClientSecret: undefined,
       xAccessTokenEnvKey: 'X_ACCOUNT_PERSONAL_USER_ACCESS_TOKEN',
       xRefreshTokenEnvKey: 'X_ACCOUNT_PERSONAL_REFRESH_TOKEN',
+      xurlApp: undefined,
+      xurlUsername: undefined,
       activeAccount: 'personal',
       configuredAccounts: ['personal', 'work'],
       mode: 'read-only',
@@ -110,6 +139,7 @@ describe('loadConfig', () => {
 describe('assertWriteEnabled', () => {
   const baseConfig: AppConfig = {
     xApiBaseUrl: 'https://api.x.com',
+    xAuthProvider: 'env',
     xUserAccessToken: 'token',
     xAccessTokenEnvKey: 'X_ACCOUNT_DEFAULT_USER_ACCESS_TOKEN',
     xRefreshTokenEnvKey: 'X_ACCOUNT_DEFAULT_REFRESH_TOKEN',

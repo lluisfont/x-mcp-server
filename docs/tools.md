@@ -13,7 +13,7 @@ Devuelve:
 - Perfil local activo.
 - Cuentas configuradas.
 - Modo actual.
-- Si la renovacion automatica de token esta configurada.
+- Proveedor de autenticacion activo.
 - Usuario autenticado en X.
 
 Uso recomendado:
@@ -96,9 +96,9 @@ El token tambien debe tener scope:
 tweet.write
 ```
 
-Antes de cada operacion de escritura, el servidor intenta refrescar el access
-token si hay `refresh_token` y `X_OAUTH_CLIENT_ID` configurados. Si no puede
-refrescar, la escritura continua con el token actual y X decide si lo acepta.
+Con `X_AUTH_PROVIDER=xurl`, la gestion de token, refresh y rotacion queda en
+manos de la CLI oficial de X. El MCP solicita a `xurl` un token valido antes de
+llamar a la API.
 
 ### `x_create_post`
 
@@ -154,6 +154,6 @@ Uso recomendado:
 - El texto exacto esta aprobado.
 - El MCP esta en `read-write`.
 - El token tiene permisos de escritura.
-- La renovacion automatica aparece configurada en `x_get_active_account`.
+- `x_get_active_account` confirma `auth.provider=xurl` o el proveedor esperado.
 - El agente sabe que debe devolver el ID.
 - No hay automatismos que publiquen sin confirmacion.

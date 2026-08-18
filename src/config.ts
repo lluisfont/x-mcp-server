@@ -1,14 +1,18 @@
 export type McpMode = 'read-only' | 'read-write';
 export type McpTransport = 'stdio' | 'http';
+export type XAuthProvider = 'env' | 'xurl';
 
 export interface AppConfig {
   xApiBaseUrl: string;
-  xUserAccessToken: string;
+  xAuthProvider: XAuthProvider;
+  xUserAccessToken?: string;
   xRefreshToken?: string;
   xOAuthClientId?: string;
   xOAuthClientSecret?: string;
   xAccessTokenEnvKey: string;
   xRefreshTokenEnvKey: string;
+  xurlApp?: string;
+  xurlUsername?: string;
   activeAccount: string;
   configuredAccounts: string[];
   mode: McpMode;
@@ -54,6 +58,7 @@ function getConfiguredAccounts(env: NodeJS.ProcessEnv): string[] {
 export function loadConfig(env: NodeJS.ProcessEnv = process.env): AppConfig {
   const mode = env.X_MCP_MODE === 'read-write' ? 'read-write' : 'read-only';
   const transport = env.X_MCP_TRANSPORT === 'http' ? 'http' : 'stdio';
+  const xAuthProvider = env.X_AUTH_PROVIDER === 'xurl' ? 'xurl' : 'env';
   const httpPort = parseHttpPort(env.PORT ?? env.X_MCP_HTTP_PORT);
   const httpPath = parseHttpPath(env.X_MCP_HTTP_PATH);
   const configuredAccounts = getConfiguredAccounts(env);
@@ -63,19 +68,26 @@ export function loadConfig(env: NodeJS.ProcessEnv = process.env): AppConfig {
   const xUserAccessToken = (env[accountTokenKey] ?? (activeAccount === DEFAULT_ACCOUNT ? env.X_USER_ACCESS_TOKEN : undefined))?.trim();
   const xRefreshToken = (env[accountRefreshTokenKey] ?? (activeAccount === DEFAULT_ACCOUNT ? env.X_REFRESH_TOKEN : undefined))?.trim();
 
-  if (!xUserAccessToken) {
+  if (xAuthProvider === 'env' && !xUserAccessToken) {
     const configured = configuredAccounts.length > 0 ? ` Configured accounts: ${configuredAccounts.join(', ')}.` : '';
     throw new Error(`No access token configured for X_MCP_ACCOUNT=${activeAccount}. Set ${accountTokenKey} or use X_USER_ACCESS_TOKEN with X_MCP_ACCOUNT=default.${configured}`);
   }
 
+  if (xAuthProvider === 'xurl' && !env.X_XURL_APP?.trim()) {
+    throw new Error('X_AUTH_PROVIDER=xurl requires X_XURL_APP to select the registered xurl app.');
+  }
+
   return {
     xApiBaseUrl: (env.X_API_BASE_URL ?? 'https://api.x.com').replace(/\/$/, ''),
+    xAuthProvider,
     xUserAccessToken,
     xRefreshToken,
     xOAuthClientId: env.X_OAUTH_CLIENT_ID?.trim(),
     xOAuthClientSecret: env.X_OAUTH_CLIENT_SECRET?.trim(),
     xAccessTokenEnvKey: accountTokenKey,
     xRefreshTokenEnvKey: accountRefreshTokenKey,
+    xurlApp: env.X_XURL_APP?.trim(),
+    xurlUsername: env.X_XURL_USERNAME?.trim(),
     activeAccount,
     configuredAccounts,
     mode,

@@ -1,6 +1,22 @@
 # OAuth de X
 
-Este proyecto usa OAuth 2.0 User Access Token para llamar a la API oficial de X.
+Para instalaciones nuevas, usar `xurl`, la CLI oficial de X, como gestor de
+OAuth, tokens, refresh y rotacion.
+
+```powershell
+npx -y @xdevplatform/xurl auth apps add fcbnews --client-id "<OAuth 2.0 Client ID>" --redirect-uri http://localhost:8080/callback
+npx -y @xdevplatform/xurl auth oauth2 --app fcbnews FCBNews2026
+```
+
+El MCP se configura con:
+
+```env
+X_AUTH_PROVIDER=xurl
+X_XURL_APP=fcbnews
+X_XURL_USERNAME=FCBNews2026
+```
+
+## Helper legacy
 
 El helper local:
 
@@ -11,8 +27,7 @@ npm run x:oauth
 implementa Authorization Code + PKCE y guarda el access token en `.env` para la
 cuenta seleccionada.
 
-El servidor tambien usa el refresh token guardado para renovar automaticamente
-el access token cuando X devuelve `401 Unauthorized`.
+Este helper queda como compatibilidad para `X_AUTH_PROVIDER=env`.
 
 ## Configuracion en X Developer
 
@@ -67,18 +82,8 @@ X_ACCOUNT_FCBNEWS2026_USER_ACCESS_TOKEN=
 X_ACCOUNT_FCBNEWS2026_REFRESH_TOKEN=
 ```
 
-En cada arranque, el servidor lee ambos tokens. Si una peticion a X falla con
-`401 Unauthorized` y existe `X_OAUTH_CLIENT_ID`, el cliente:
-
-1. Solicita un nuevo access token usando `grant_type=refresh_token`.
-2. Actualiza el access token en memoria.
-3. Guarda el nuevo access token y refresh token en `.env`.
-4. Reintenta la peticion original una vez.
-
-Para herramientas de escritura, el servidor tambien intenta refrescar el token
-antes de publicar. La comprobacion previa recomendada desde el agente sigue
-siendo `x_get_active_account`, porque confirma cuenta, modo y estado de
-renovacion sin publicar nada.
+Con `X_AUTH_PROVIDER=xurl`, el MCP no lee estos tokens de `.env`; los gestiona
+`xurl` en su propio almacenamiento local.
 
 Si `X_MCP_ACCOUNT=default`, guarda:
 
